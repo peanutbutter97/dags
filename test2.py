@@ -22,7 +22,7 @@ with DAG(
     dag_id="test_scheduler_dag_1",
     default_args=default_args,
     description="A test DAG for Airflow Scheduler",
-    schedule_interval="*/1 * * * *",   # every 1 minute
+    schedule_interval="0 * * * *",   # every 1 minute
     start_date=datetime(2025, 9, 25),
     catchup=False,
     tags=["test"],
