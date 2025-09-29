@@ -16,12 +16,12 @@ from airflow_demo.etl_func import get_dest_table_name
 )
 def postgres_arrow_etl_dag():
     conn_params: Dict[str, str] = {
-        'dbname': "dev",
+        'dbname': "postgres",
         'user': "postgres",
         'password': "12345",
         'host': "postgres-db",
     }
-    source_table_name: str = "s_db_retool.dummy_tbl"
+    source_table_name: str = "public.dummy_tbl"
     batch_size: int = 400
     where: str = ""
     dest_table_name = get_dest_table_name(source_table_name)
