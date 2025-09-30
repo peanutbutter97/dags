@@ -77,7 +77,7 @@ def extract_batch(
         transformed_arrays = transform_batch(pa_arrays, transform_fn=None)
 
         # --- Write ---
-        output_path = '/opt/airflow/data/output'
+        output_path = 'data/output'
         file_path = write_batch(
             pa_arrays=transformed_arrays,
             pa_schema=pa_schema,
