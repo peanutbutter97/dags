@@ -18,7 +18,7 @@ def postgres_arrow_etl_dag():
     conn_params: Dict[str, str] = {
         'dbname': "postgres",
         'user': "postgres",
-        'password': "12345",
+        'password': "postgres",
         'host': "mq-airflow-etl-test.cwanclutkkrz.ap-southeast-1.rds.amazonaws.com",
     }
     source_table_name: str = "public.dummy_tbl"
