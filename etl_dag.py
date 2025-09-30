@@ -19,7 +19,7 @@ def postgres_arrow_etl_dag():
         'dbname': "postgres",
         'user': "postgres",
         'password': "12345",
-        'host': "postgres-db",
+        'host': "mq-airflow-etl-test.cwanclutkkrz.ap-southeast-1.rds.amazonaws.com",
     }
     source_table_name: str = "public.dummy_tbl"
     batch_size: int = 400
