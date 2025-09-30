@@ -4,10 +4,10 @@ from airflow.operators.python import PythonOperator
 
 # Simple Python functions
 def hello_task():
-    print("✅ Hello from Airflow DAG!")
+    print("Hello from Airflow DAG!")
 
 def fail_task():
-    raise Exception("❌ Intentional failure to test scheduler error handling")
+    raise Exception("Intentional failure to test scheduler error handling")
 
 # Default args
 default_args = {
