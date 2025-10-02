@@ -1,5 +1,6 @@
-from airflow_demo.etl_func import transform_batch, write_batch, convert_data_to_arrow, create_pa_schema, add_metadata_to_pa_tbl
+from airflow_demo.etl_func import transform_batch, write_batch, convert_data_to_arrow, create_pa_schema, add_metadata_to_pa_tbl, read_arrow_s3
 from airflow_demo.db_func import init_db_conn, fetch_batch, close_db_connection, count_tbl_row, insert_batch_to_table
+from airflow_demo.aws_func import upload_to_public_s3
 from airflow.decorators import task
 from typing import Dict
 import logging
@@ -8,9 +9,10 @@ from typing import List, Optional, Tuple
 import pyarrow.ipc as ipc
 from airflow.utils.trigger_rule import TriggerRule
 from psycopg2 import sql
+import os
 
 @task(max_active_tis_per_dag=1)
-def get_batch_params(conn_params: Dict, source_table_name: str, dest_table_name: str, batch_size: int, where: str = "", **context) -> list[dict]:
+def get_batch_params(conn_params: Dict, bucket_name: str, source_table_name: str, dest_table_name: str, batch_size: int, where: str = "", **context) -> list[dict]:
     """Return list of batch parameters for dynamic task mapping."""
     conn = None
     cur = None
@@ -26,6 +28,7 @@ def get_batch_params(conn_params: Dict, source_table_name: str, dest_table_name:
         return [
             {
                 'conn_params': conn_params,
+                'bucket_name': bucket_name,
                 'source_table_name': source_table_name,
                 'dest_table_name': dest_table_name,
                 'batch_num': i,
@@ -40,6 +43,7 @@ def get_batch_params(conn_params: Dict, source_table_name: str, dest_table_name:
 @task(max_active_tis_per_dag=2)
 def extract_batch(
     conn_params: Dict,
+    bucket_name: str,
     source_table_name: str,
     dest_table_name: str,
     batch_num: int,
@@ -50,7 +54,6 @@ def extract_batch(
     """ETL for a single batch."""
     conn = None
     cur = None
-    file_path: str = ""
     batch_params: Dict = {
         'conn_params': conn_params,
         'source_table_name': source_table_name,
@@ -77,16 +80,15 @@ def extract_batch(
         transformed_arrays = transform_batch(pa_arrays, transform_fn=None)
 
         # --- Write ---
-        output_path = 'data/output'
-        file_path = write_batch(
+        s3_path = write_batch(
             pa_arrays=transformed_arrays,
             pa_schema=pa_schema,
-            output_path=output_path,
+            bucket_name=bucket_name,
             table_name=source_table_name,
-            batch_num=batch_num
+            batch_num=batch_num,
         )
-        batch_params["file_path"] = file_path
-        logging.info(f"[extract_batch] Batch {batch_num} written to {file_path}")
+        batch_params["s3_path"] = s3_path
+        logging.info(f"[extract_batch] Batch {batch_num} written to {s3_path}")
     except Exception as e:
         logging.error(f"[extract_batch] Error in batch {batch_num}: {str(e)}")
         return batch_params
@@ -100,7 +102,7 @@ def load_batch(
     source_table_name: str,
     dest_table_name: str,
     batch_num: int,
-    file_path: str,
+    s3_path: str,
     column_names: Optional[List[str]] = None,
     **context
 ) -> Dict:
@@ -113,12 +115,11 @@ def load_batch(
     logging.info(f"[get_batch_params] DAG Run ID: {context['dag_run'].run_id}")
     try:
         # 1. Read Arrow file
-        logging.info(f"[load_batch] Reading Arrow file {file_path}")
-        with ipc.RecordBatchFileReader(file_path) as reader:
-            pa_table = reader.read_all()
+        logging.info(f"[load_batch] Reading Arrow file {s3_path}")
+        pa_table = read_arrow_s3(s3_path)
         
         if pa_table.num_rows == 0:
-            logging.warning(f"[load_batch] No data in Arrow file {file_path}")
+            logging.warning(f"[load_batch] No data in Arrow file {s3_path}")
             return False
 
         pa_table = add_metadata_to_pa_tbl(pa_table, context['dag_run'].run_id)

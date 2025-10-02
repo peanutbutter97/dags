@@ -1,10 +1,8 @@
 import pyarrow as pa
-import pyarrow.ipc as ipc
 from typing import Callable, List, Optional, Tuple
 import logging
 import datetime as dt
 import pendulum
-import os
 
 def transform_batch(
         batch: List[Tuple],
@@ -18,7 +16,7 @@ def transform_batch(
 def write_batch(
     pa_arrays: list[pa.Array],
     pa_schema: pa.Schema,
-    output_path: str,
+    bucket_name: str,
     table_name: str,
     batch_num: int = 0,
 ) -> str:
@@ -28,7 +26,7 @@ def write_batch(
     Args:
         pa_arrays (list[pa.Array]): List of PyArrow arrays, one per column.
         pa_schema (pa.Schema): PyArrow schema for the batch.
-        output_path (str): Directory to save the Arrow file.
+        bucket_name (str): S3 bucket name.
         table_name (str): Table name for file naming.
         batch_num (int): Batch number for file naming.
 
@@ -42,9 +40,8 @@ def write_batch(
             return None
 
         try:
-            # Initialize writer and get file path
-            pa_writer, batch_file_path = init_writer(
-                output_path=output_path,
+            pa_writer, s3_fs, batch_file_path = init_writer(
+                bucket_name=bucket_name,
                 table_name=table_name,
                 pa_schema=pa_schema,
                 batch_num=batch_num
@@ -57,17 +54,18 @@ def write_batch(
             logging.info(f"[write_batch] Successfully wrote batch {batch_num} to {batch_file_path}")
         finally:
             pa_writer.close()
+            s3_fs.close()
     except Exception as e:
         logging.error(f"[write_batch] Error writing batch {batch_num}: {str(e)}")
         batch_file_path = ""
     return batch_file_path
 
 def init_writer(
-    output_path: str,
+    bucket_name: str,
     table_name: str,
     pa_schema: pa.Schema,
     batch_num: int = 0,
-) -> Tuple[ipc.RecordBatchFileWriter, str]:
+) -> Tuple[pa.ipc.RecordBatchFileWriter, pa.fs.S3FileSystem, str]:
     """
     Initialize a PyArrow RecordBatchFileWriter and generate the file path.
 
@@ -84,18 +82,18 @@ def init_writer(
         # Generate unique filename
         date_str = dt.datetime.now().strftime('%Y%m%d')
         clean_table_name = table_name.replace('.', '_').lstrip('_')
-        os.makedirs(output_path, exist_ok=True)
-        batch_file_path = os.path.join(
-            output_path,
-            f"{clean_table_name}_{date_str}_{batch_num:03d}.arrow"
-        )
+        s3_obj_key = f"{clean_table_name}/{clean_table_name}_{date_str}_{batch_num:03d}.arrow"
 
-        pa_writer = ipc.RecordBatchFileWriter(
-            batch_file_path,
+        # Initialize writer and get s3 object key
+        s3_path = f"{bucket_name}/{s3_obj_key}"
+        s3_fs = pa.fs.S3FileSystem(region="ap-southeast-01").open_output_stream(s3_path)
+        
+        pa_writer = pa.ipc.RecordBatchFileWriter(
+            s3_fs,
             pa_schema,
-            options=ipc.IpcWriteOptions(compression='lz4')
+            options=pa.ipc.ipcWriteOptions(compression='lz4')
         )
-        return pa_writer, batch_file_path
+        return pa_writer, s3_fs, s3_path
 
     except Exception as e:
         logging.error(f"[init_writer] Error initializing writer for batch {batch_num}: {e}")
@@ -237,42 +235,36 @@ def convert_data_to_arrow(batch: List[Tuple], pa_schema: pa.Schema) -> Optional[
     logging.info(f"[convert_data_to_arrow] Successfully created PyArrow arrays with {len(pa_array)} columns")
     return pa_array
 
-def read_arrow_batch(file_path: str, batch_size: int = 100_000) -> List[List]:
-    """Read Arrow file in batches."""
+
+def read_arrow_s3(s3_path: str, region: str = "ap-southeast-1") -> pa.Table:
+    """
+    Read an Arrow (.arrow) file from S3 and return a PyArrow Table.
+
+    :param bucket_name: str, S3 bucket name
+    :param object_key: str, key of the .arrow file in the bucket
+    :param region: str, AWS region
+    :return: pyarrow.Table
+    """
+    s3_fs = None
+    pa_reader = None
     try:
-        logging.info(f"[read_arrow_batch] Opening Arrow file: {file_path}")
-        with pa.ipc.open_file(file_path) as reader:
-            logging.info(f"[read_arrow_batch] File opened successfully, reading with batch size {batch_size}")
-            batches = []
-            current_batch = []
-            total_rows = 0
-            
-            for batch in reader:
-                # Convert RecordBatch to list of lists
-                batch_data = [batch.column(i).to_pylist() for i in range(batch.num_columns)]
-                # Transpose to get rows instead of columns
-                rows = list(zip(*batch_data))
-                
-                for row in rows:
-                    current_batch.append(list(row))
-                    total_rows += 1
-                    
-                    if len(current_batch) >= batch_size:
-                        batches.append(current_batch)
-                        logging.info(f"[read_arrow_batch] Batch completed with {len(current_batch)} rows")
-                        current_batch = []
-            
-            # Add remaining rows
-            if current_batch:
-                batches.append(current_batch)
-                logging.info(f"[read_arrow_batch] Final batch with {len(current_batch)} rows")
-                
-            logging.info(f"[read_arrow_batch] Successfully read {total_rows} total rows in {len(batches)} batches")
-            return batches
-            
+        logging.info(f"[read_arrow_s3] Opening Arrow file from S3: s3://{s3_path}")
+        
+        s3_fs = pa.fs.S3FileSystem(region=region).open_input_file(s3_path):
+        pa_reader = pa.ipc.RecordBatchFileReader(s3_fs):
+        pa_table = pa_reader.read_all()
+        
+        logging.info(f"[read_arrow_s3] Successfully read {pa_table.num_rows} rows and {pa_table.num_columns} columns")
+        return pa_table
+
     except Exception as e:
-        logging.error(f"[read_arrow_batch] Error reading Arrow file {file_path}: {str(e)}")
-        return []
+        logging.error(f"[read_arrow_s3] Error reading Arrow file: {e}")
+        return pa.Table.from_arrays([], [])
+    finally:
+        if pa_reader:
+            pa_reader.close()
+        if s3_fs:
+            s3_fs.close()
     
 def add_metadata_to_pa_tbl(pa_table: pa.Table, dag_run_id: str) -> pa.Table:
     dag_run_id_col = pa.array([dag_run_id] * pa_table.num_rows, type=pa.string())

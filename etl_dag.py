@@ -15,19 +15,21 @@ from airflow_demo.etl_func import get_dest_table_name
     description='PostgreSQL to Arrow ETL pipeline using Airflow',
 )
 def postgres_arrow_etl_dag():
+    db_host = "mq-airflow-etl-test.cwanclutkkrz.ap-southeast-1.rds.amazonaws.com"
+    source_table_name: str = "public.dummy_tbl"
+    batch_size: int = 400
+    bucket_name: str = "mq-de-airflow-demo-etl"
+    where: str = ""
+    dest_table_name = get_dest_table_name(source_table_name)
     conn_params: Dict[str, str] = {
         'dbname': "postgres",
         'user': "postgres",
         'password': "postgres",
-        'host': "mq-airflow-etl-test.cwanclutkkrz.ap-southeast-1.rds.amazonaws.com",
+        'host': db_host,
     }
-    source_table_name: str = "public.dummy_tbl"
-    batch_size: int = 400
-    where: str = ""
-    dest_table_name = get_dest_table_name(source_table_name)
 
     # 1. Calculate total batches
-    batch_params: List[Dict] = get_batch_params(conn_params, source_table_name, dest_table_name, batch_size, where=where)
+    batch_params: List[Dict] = get_batch_params(conn_params, bucket_name, source_table_name, dest_table_name, batch_size, where=where)
 
     # 2. Dynamically create extract tasks per batch
     extract_batch_params = extract_batch.expand_kwargs(batch_params)
