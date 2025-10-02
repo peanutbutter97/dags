@@ -17,7 +17,7 @@ from airflow_demo.etl_func import get_dest_table_name
 def postgres_arrow_etl_dag():
     db_host = "mq-airflow-etl-test.cwanclutkkrz.ap-southeast-1.rds.amazonaws.com"
     source_table_name: str = "public.dummy_tbl"
-    batch_size: int = 400
+    batch_size: int = 400_000
     bucket_name: str = "mq-de-airflow-demo-etl"
     where: str = ""
     dest_table_name = get_dest_table_name(source_table_name)
