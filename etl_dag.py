@@ -29,26 +29,23 @@ def postgres_arrow_etl_dag():
     }
 
     # 1. Calculate total batches
-    batch_params: List[Dict] = get_batch_params(conn_params, bucket_name, source_table_name, dest_table_name, batch_size, where=where)
+    batch_params_task = get_batch_params(conn_params, bucket_name, source_table_name, dest_table_name, batch_size, where=where)
 
     # 2. Prepare staging table
-    staging_table_name = prepare_staging_table(conn_params, dest_table_name)
+    staging_table_name_task = prepare_staging_table(conn_params, dest_table_name)
 
     # 3. Dynamically create extract tasks per batch
-    extract_batch_params = extract_batch.expand_kwargs(batch_params)
+    extract_batch_task = extract_batch.partial().expand_kwargs(batch_params_task)
 
-    # 4. Map load tasks per batch after extract (using staging table from XCom)
-    load_batch_partial = load_batch.partial(dest_table_name_staging=staging_table_name)
-    load_batch_task = load_batch_partial.expand_kwargs(extract_batch_params)
-    
+    # 4. Map load tasks per batch after extract
+    load_batch_partial_task = load_batch.partial(dest_table_name_staging=staging_table_name_task)
+    load_batch_task = load_batch_partial_task.expand_kwargs(extract_batch_task)
+
     # 5. Finalize table swap after all loads complete
-    finalize_task = finalize_table_swap(conn_params, dest_table_name, staging_table_name)
-
-    # 6. Rollback data in case of any load failure (using staging table)
-    # rollback_task = rollback_on_failure(conn_params, staging_table_name)
+    finalize_table_swap_task = finalize_table_swap(conn_params, dest_table_name, staging_table_name_task)
 
     # Set dependencies
-    batch_params >> staging_table_name >> extract_batch_params >> load_batch_task >> finalize_task
+    batch_params_task >> staging_table_name_task >> extract_batch_task >> load_batch_task >> finalize_table_swap_task
     # load_batch_task >> rollback_task
 
 # Instantiate the DAG
