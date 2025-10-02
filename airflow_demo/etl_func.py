@@ -93,7 +93,7 @@ def init_writer(
         pa_writer = pa.ipc.RecordBatchFileWriter(
             s3_fs,
             pa_schema,
-            options=pa.ipc.ipcWriteOptions(compression='lz4')
+            options=pa.ipc.IpcWriteOptions(compression='lz4')
         )
         return pa_writer, s3_fs, s3_path
 
