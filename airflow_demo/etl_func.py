@@ -87,7 +87,7 @@ def init_writer(
         s3_obj_key = f"{clean_table_name}/{clean_table_name}_{date_str}_{batch_num:03d}.arrow"
 
         # Initialize writer and get s3 object key
-        s3_path = f"s3://{bucket_name}/{s3_obj_key}"
+        s3_path = f"{bucket_name}/{s3_obj_key}"
         s3_fs = pa_fs.S3FileSystem(region="ap-southeast-1").open_output_stream(s3_path)
         
         pa_writer = pa.ipc.RecordBatchFileWriter(
@@ -99,7 +99,7 @@ def init_writer(
 
     except Exception as e:
         logging.error(f"[init_writer] Error initializing writer for batch {batch_num}: {e}")
-        return None, None
+        return None, None, None
     
 def create_pa_schema(cursor_desc: Tuple) -> Optional[pa.Schema]:
         # Infer schema from cursor description or data types
@@ -250,7 +250,7 @@ def read_arrow_s3(s3_path: str, region: str = "ap-southeast-1") -> pa.Table:
     s3_fs = None
     pa_reader = None
     try:
-        logging.info(f"[read_arrow_s3] Opening Arrow file from S3: s3://{s3_path}")
+        logging.info(f"[read_arrow_s3] Opening Arrow file from S3: {s3_path}")
         
         s3_fs = pa_fs.S3FileSystem(region=region).open_input_file(s3_path)
         pa_reader = pa.ipc.RecordBatchFileReader(s3_fs)
