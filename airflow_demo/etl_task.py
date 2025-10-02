@@ -9,12 +9,11 @@ from airflow.utils.trigger_rule import TriggerRule
 from psycopg2 import sql
 
 @task(max_active_tis_per_dag=1)
-def get_batch_params(conn_params: Dict, bucket_name: str, source_table_name: str, dest_table_name: str, batch_size: int, where: str = "", **context) -> list[dict]:
+def get_batch_params(conn_params: Dict, source_table_name: str, batch_size: int, where: str = "", **context) -> list[dict]:
     """Return list of batch parameters for dynamic task mapping."""
     conn = None
     cur = None
     logging.info(f"[get_batch_params] DAG Run ID: {context['dag_run'].run_id}")
-    logging.info(f"[get_batch_params] dest_table_name: {dest_table_name}")
     try:
         conn = init_db_conn(**conn_params)
         total_rows = count_tbl_row(conn, source_table_name, where=where)
@@ -25,9 +24,7 @@ def get_batch_params(conn_params: Dict, bucket_name: str, source_table_name: str
         return [
             {
                 'conn_params': conn_params,
-                'bucket_name': bucket_name,
                 'source_table_name': source_table_name,
-                'dest_table_name': dest_table_name,
                 'batch_num': i,
                 'batch_size': batch_size,
                 'where': where,
