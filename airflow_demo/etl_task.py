@@ -53,6 +53,7 @@ def extract_batch(
     cur = None
     batch_params: Dict = {
         'conn_params': conn_params,
+        'bucket_name': bucket_name,
         'source_table_name': source_table_name,
         'dest_table_name': dest_table_name,
         'batch_num': batch_num,
