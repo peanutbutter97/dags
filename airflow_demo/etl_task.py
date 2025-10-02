@@ -180,27 +180,64 @@ def finalize_table_swap(conn_params: Dict, dest_table_name: str, dest_table_name
         close_db_connection(conn, None)
 
 @task(trigger_rule=TriggerRule.ONE_FAILED)
-def rollback_on_failure(conn_params: Dict, dest_table_name_staging: str, **context) -> bool:  # Changed to staging table
-    """This task runs only if at least one load task fails"""
+def rollback_on_failure(conn_params: Dict, dest_table_name: str, dest_table_name_staging: str, **context) -> bool:
+    """
+    Rollback logic:
+    - Drop staging table if exists.
+    - If dest_table_name_old exists:
+        - Drop dest_table_name if exists.
+        - Rename dest_table_name_old to dest_table_name.
+    """
     conn = None
     cur = None
-    dag_run_id: str = context['dag_run'].run_id
+    old_table_name = f"{dest_table_name}_old"
     try:
-        # Connect to Postgres
         logging.info(f"[rollback_task] Connecting to DB at {conn_params['host']}")
         conn = init_db_conn(**conn_params)
         cur = conn.cursor()
-        
-        # Build DELETE query safely for staging table
-        delete_query = sql.SQL("DELETE FROM {} WHERE dag_run_id = %s").format(
-            sql.Identifier(*dest_table_name_staging.split('.'))
+
+        # Drop staging table if exists
+        logging.info(f"[rollback_task] Dropping staging table if exists: {dest_table_name_staging}")
+        cur.execute(
+            sql.SQL("DROP TABLE IF EXISTS {}").format(
+                sql.Identifier(*dest_table_name_staging.split('.'))
+            )
         )
-        logging.info(f"[rollback_task] Executing DELETE for dag_run_id={dag_run_id} from staging table")
-        cur.execute(delete_query, (dag_run_id,))
-        deleted_rows = cur.rowcount
+
+        # Check if old table exists
+        logging.info(f"[rollback_task] Checking if old table exists: {old_table_name}")
+        cur.execute(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = %s AND table_name = %s
+            )
+            """,
+            (old_table_name.split('.')[0] if '.' in old_table_name else 'public', old_table_name.split('.')[-1])
+        )
+        old_exists = cur.fetchone()[0]
+
+        if old_exists:
+            # Drop dest_table_name if exists
+            logging.info(f"[rollback_task] Dropping dest table if exists: {dest_table_name}")
+            cur.execute(
+                sql.SQL("DROP TABLE IF EXISTS {}").format(
+                    sql.Identifier(*dest_table_name.split('.'))
+                )
+            )
+            # Rename old table back to dest_table_name
+            logging.info(f"[rollback_task] Renaming {old_table_name} to {dest_table_name}")
+            cur.execute(
+                sql.SQL("ALTER TABLE {} RENAME TO {}").format(
+                    sql.Identifier(*old_table_name.split('.')),
+                    sql.Identifier(dest_table_name.split('.')[-1])
+                )
+            )
+
         conn.commit()
-        
-        logging.info(f"[rollback_task] Deleted {deleted_rows} rows from staging table {dest_table_name_staging}")
+        logging.info("[rollback_task] Rollback completed successfully")
+        return True
+
     except Exception as e:
         logging.error(f"[rollback_task] Error during rollback: {str(e)}")
         if conn:
