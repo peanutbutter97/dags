@@ -1,5 +1,6 @@
 import pyarrow as pa
 from pyarrow import fs as pa_fs
+from pyarrow import ipc as pa_ipc
 from typing import Callable, List, Optional, Tuple
 import logging
 import datetime as dt
@@ -67,7 +68,7 @@ def init_writer(
     table_name: str,
     pa_schema: pa.Schema,
     batch_num: int = 0,
-) -> Tuple[pa.ipc.RecordBatchFileWriter, pa_fs.S3FileSystem, str]:
+) -> Tuple[pa_ipc.RecordBatchFileWriter, pa_fs.S3FileSystem, str]:
     """
     Initialize a PyArrow RecordBatchFileWriter and generate the file path.
 
@@ -90,16 +91,15 @@ def init_writer(
         s3_path = f"{bucket_name}/{s3_obj_key}"
         s3_fs = pa_fs.S3FileSystem(region="ap-southeast-1").open_output_stream(s3_path)
         
-        pa_writer = pa.ipc.RecordBatchFileWriter(
+        pa_writer = pa_ipc.RecordBatchFileWriter(
             s3_fs,
             pa_schema,
-            options=pa.ipc.ipcWriteOptions(compression='lz4')
+            options=pa_ipc.ipcWriteOptions(compression='lz4')
         )
         return pa_writer, s3_fs, s3_path
-
     except Exception as e:
         logging.error(f"[init_writer] Error initializing writer for batch {batch_num}: {e}")
-        return None, None, None
+        raise
     
 def create_pa_schema(cursor_desc: Tuple) -> Optional[pa.Schema]:
         # Infer schema from cursor description or data types
@@ -253,7 +253,7 @@ def read_arrow_s3(s3_path: str, region: str = "ap-southeast-1") -> pa.Table:
         logging.info(f"[read_arrow_s3] Opening Arrow file from S3: {s3_path}")
         
         s3_fs = pa_fs.S3FileSystem(region=region).open_input_file(s3_path)
-        pa_reader = pa.ipc.RecordBatchFileReader(s3_fs)
+        pa_reader = pa_ipc.RecordBatchFileReader(s3_fs)
         pa_table = pa_reader.read_all()
         
         logging.info(f"[read_arrow_s3] Successfully read {pa_table.num_rows} rows and {pa_table.num_columns} columns")
