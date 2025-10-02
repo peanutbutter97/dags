@@ -98,8 +98,8 @@ def init_writer(
         return pa_writer, s3_fs, s3_path
 
     except Exception as e:
-        logging.error(f"[init_writer] Error initializing writer for batch {batch_num}: {e}")
-        return None, None, None
+        logging.exception(f"[init_writer] Error initializing writer for batch {batch_num}")
+        raise
     
 def create_pa_schema(cursor_desc: Tuple) -> Optional[pa.Schema]:
         # Infer schema from cursor description or data types
@@ -248,7 +248,6 @@ def read_arrow_s3(s3_path: str, region: str = "ap-southeast-1") -> pa.Table:
     :return: pyarrow.Table
     """
     s3_fs = None
-    pa_reader = None
     try:
         logging.info(f"[read_arrow_s3] Opening Arrow file from S3: {s3_path}")
         
@@ -263,8 +262,6 @@ def read_arrow_s3(s3_path: str, region: str = "ap-southeast-1") -> pa.Table:
         logging.error(f"[read_arrow_s3] Error reading Arrow file: {e}")
         return pa.Table.from_arrays([], [])
     finally:
-        if pa_reader:
-            pa_reader.close()
         if s3_fs:
             s3_fs.close()
     
