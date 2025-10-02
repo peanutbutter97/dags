@@ -43,6 +43,7 @@ def write_batch(
             return None
 
         pa_writer, s3_fs, s3_path = init_writer(
+            bucket_name=bucket_name,
             table_name=table_name,
             pa_schema=pa_schema,
             batch_num=batch_num
