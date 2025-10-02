@@ -6,10 +6,8 @@ from typing import Dict
 import logging
 import math
 from typing import List, Optional, Tuple
-import pyarrow.ipc as ipc
 from airflow.utils.trigger_rule import TriggerRule
 from psycopg2 import sql
-import os
 
 @task(max_active_tis_per_dag=1)
 def get_batch_params(conn_params: Dict, bucket_name: str, source_table_name: str, dest_table_name: str, batch_size: int, where: str = "", **context) -> list[dict]:
