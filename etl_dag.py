@@ -21,6 +21,7 @@ def postgres_arrow_etl_dag():
     bucket_name: str = "mq-de-airflow-demo-etl"
     where: str = ""
     dest_table_name = get_dest_table_name(source_table_name)
+    column_names: List[str] = []
     conn_params: Dict[str, str] = {
         'dbname': "postgres",
         'user': "postgres",
@@ -41,13 +42,20 @@ def postgres_arrow_etl_dag():
 
     # 3. Dynamically create extract tasks per batch
     extract_batch_task = extract_batch.partial(
+        conn_params=conn_params,
+        source_table_name=source_table_name,
+        where=where,
+        batch_size=batch_size,
         bucket_name=bucket_name,
-        dest_table_name=dest_table_name,
+        column_names=column_names,
     ).expand_kwargs(batch_params_task)
 
     # 4. Map load tasks per batch after extract
     load_batch_task = load_batch.partial(
-        dest_table_name_staging=staging_table_name_task
+        conn_params=conn_params,
+        source_table_name=source_table_name,
+        dest_table_name_staging=staging_table_name_task,
+        column_names=column_names,
     ).expand_kwargs(extract_batch_task)
 
     # 5. Finalize table swap after all loads complete

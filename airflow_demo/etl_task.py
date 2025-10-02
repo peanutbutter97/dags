@@ -21,16 +21,7 @@ def get_batch_params(conn_params: Dict, source_table_name: str, batch_size: int,
         logging.info(f"[get_batch_params] Total rows={total_rows}, batches={total_batches}")
 
         # Return list of dictionaries (one per batch)
-        return [
-            {
-                'conn_params': conn_params,
-                'source_table_name': source_table_name,
-                'batch_num': i,
-                'batch_size': batch_size,
-                'where': where,
-            }
-            for i in range(total_batches)
-        ]
+        return [{ 'batch_num': i } for i in range(total_batches)]
     finally:
         close_db_connection(conn, cur)
 
@@ -39,7 +30,6 @@ def extract_batch(
     conn_params: Dict,
     bucket_name: str,
     source_table_name: str,
-    dest_table_name: str,
     batch_num: int,
     batch_size: int,
     where: str = "",
@@ -49,10 +39,6 @@ def extract_batch(
     conn = None
     cur = None
     batch_params: Dict = {
-        'conn_params': conn_params,
-        'bucket_name': bucket_name,
-        'source_table_name': source_table_name,
-        'dest_table_name': dest_table_name,
         'batch_num': batch_num,
     }
     logging.info(f"[get_batch_params] DAG Run ID: {context['dag_run'].run_id}")
@@ -127,10 +113,9 @@ def prepare_staging_table(conn_params: Dict, dest_table_name: str, **context) ->
 @task(max_active_tis_per_dag=2)
 def load_batch(
     conn_params: Dict,
-    source_table_name: str,
     batch_num: int,
     s3_path: str,
-    dest_table_name_staging: str,  # This will come from XCom
+    dest_table_name_staging: str,
     column_names: Optional[List[str]] = None,
     **context
 ) -> Dict:
