@@ -65,7 +65,7 @@ def init_writer(
     table_name: str,
     pa_schema: pa.Schema,
     batch_num: int = 0,
-) -> Tuple[pa.ipc.RecordBatchFileWriter, pa.filesystem.S3FileSystem, str]:
+) -> Tuple[pa.ipc.RecordBatchFileWriter, pa.fs.S3FileSystem, str]:
     """
     Initialize a PyArrow RecordBatchFileWriter and generate the file path.
 
@@ -86,7 +86,7 @@ def init_writer(
 
         # Initialize writer and get s3 object key
         s3_path = f"{bucket_name}/{s3_obj_key}"
-        s3_fs = pa.filesystem.S3FileSystem(region="ap-southeast-01").open_output_stream(s3_path)
+        s3_fs = pa.fs.S3FileSystem(region="ap-southeast-01").open_output_stream(s3_path)
         
         pa_writer = pa.ipc.RecordBatchFileWriter(
             s3_fs,
@@ -250,7 +250,7 @@ def read_arrow_s3(s3_path: str, region: str = "ap-southeast-1") -> pa.Table:
     try:
         logging.info(f"[read_arrow_s3] Opening Arrow file from S3: s3://{s3_path}")
         
-        s3_fs = pa.filesystem.S3FileSystem(region=region).open_input_file(s3_path)
+        s3_fs = pa.fs.S3FileSystem(region=region).open_input_file(s3_path)
         pa_reader = pa.ipc.RecordBatchFileReader(s3_fs)
         pa_table = pa_reader.read_all()
         
