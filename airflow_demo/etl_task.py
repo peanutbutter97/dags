@@ -1,6 +1,5 @@
 from airflow_demo.etl_func import transform_batch, write_batch, convert_data_to_arrow, create_pa_schema, add_metadata_to_pa_tbl, read_arrow_s3
 from airflow_demo.db_func import init_db_conn, fetch_batch, close_db_connection, count_tbl_row, insert_batch_to_table
-from airflow_demo.aws_func import upload_to_public_s3
 from airflow.decorators import task
 from typing import Dict
 import logging
