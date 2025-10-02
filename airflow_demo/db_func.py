@@ -172,3 +172,124 @@ def count_tbl_row(
 
     except Exception as e:
         logging.error(f"[count_tbl_row] Error counting rows in {table_name}: {str(e)}")
+
+def table_exists(conn, table_name: str) -> bool:
+    """Check if a table exists."""
+    cur = None
+    try:
+        cur = conn.cursor()
+        schema_name, tbl_name = table_name.split('.') if '.' in table_name else ('public', table_name)
+        
+        check_query = """
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_schema = %s AND table_name = %s
+        );
+        """
+        cur.execute(check_query, (schema_name, tbl_name))
+        exists = cur.fetchone()[0]
+        logging.info(f"[table_exists] Table {table_name} exists: {exists}")
+        return exists
+        
+    except Exception as e:
+        logging.error(f"[table_exists] Error checking if table {table_name} exists: {str(e)}")
+        raise
+    finally:
+        if cur:
+            cur.close()
+
+def drop_table_if_exists(conn, table_name: str) -> bool:
+    """Drop table if it exists."""
+    cur = None
+    try:
+        cur = conn.cursor()
+        drop_query = sql.SQL("DROP TABLE IF EXISTS {}").format(
+            sql.Identifier(*table_name.split('.'))
+        )
+        cur.execute(drop_query)
+        conn.commit()
+        logging.info(f"[drop_table_if_exists] Dropped table {table_name} if it existed")
+        return True
+        
+    except Exception as e:
+        logging.error(f"[drop_table_if_exists] Error dropping table {table_name}: {str(e)}")
+        conn.rollback()
+        raise
+    finally:
+        if cur:
+            cur.close()
+
+def atomic_table_swap(conn, dest_table_name: str, staging_table_name: str) -> bool:
+    """Perform atomic table swap: dest -> old, staging -> dest, drop old."""
+    cur = None
+    try:
+        cur = conn.cursor()
+        
+        # Generate old table name
+        old_table_name = f"{dest_table_name}_old"
+        
+        # Start transaction for atomic operation
+        cur.execute("BEGIN;")
+        
+        # Step 1: Rename current table to _old (if exists)
+        if table_exists(conn, dest_table_name):
+            rename_query = sql.SQL("ALTER TABLE {} RENAME TO {}").format(
+                sql.Identifier(*dest_table_name.split('.')),
+                sql.Identifier(old_table_name.split('.')[-1])
+            )
+            cur.execute(rename_query)
+            logging.info(f"[atomic_table_swap] Renamed {dest_table_name} to {old_table_name}")
+        
+        # Step 2: Rename staging table to destination
+        rename_query = sql.SQL("ALTER TABLE {} RENAME TO {}").format(
+            sql.Identifier(*staging_table_name.split('.')),
+            sql.Identifier(dest_table_name.split('.')[-1])
+        )
+        cur.execute(rename_query)
+        logging.info(f"[atomic_table_swap] Renamed {staging_table_name} to {dest_table_name}")
+        
+        # Step 3: Drop old table (if it exists)
+        if table_exists(conn, old_table_name):
+            drop_query = sql.SQL("DROP TABLE {}").format(
+                sql.Identifier(*old_table_name.split('.'))
+            )
+            cur.execute(drop_query)
+            logging.info(f"[atomic_table_swap] Dropped old table {old_table_name}")
+        
+        # Commit transaction
+        cur.execute("COMMIT;")
+        logging.info(f"[atomic_table_swap] Successfully completed atomic table swap")
+        return True
+        
+    except Exception as e:
+        logging.error(f"[atomic_table_swap] Error during table swap: {str(e)}")
+        if cur:
+            cur.execute("ROLLBACK;")
+        raise
+    finally:
+        if cur:
+            cur.close()
+
+def create_staging_table_like(conn, dest_table_name: str, staging_table_name: str) -> bool:
+    """Create staging table using CREATE TABLE ... LIKE syntax."""
+    cur = None
+    try:
+        cur = conn.cursor()
+        
+        # Create staging table with same structure as destination table
+        create_query = sql.SQL("CREATE TABLE {} (LIKE {} INCLUDING ALL)").format(
+            sql.Identifier(*staging_table_name.split('.')),
+            sql.Identifier(*dest_table_name.split('.'))
+        )
+        cur.execute(create_query)
+        conn.commit()
+        logging.info(f"[create_staging_table_like] Created staging table {staging_table_name} like {dest_table_name}")
+        return True
+        
+    except Exception as e:
+        logging.error(f"[create_staging_table_like] Error creating staging table {staging_table_name}: {str(e)}")
+        conn.rollback()
+        raise
+    finally:
+        if cur:
+            cur.close()
