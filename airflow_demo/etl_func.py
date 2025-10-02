@@ -250,8 +250,8 @@ def read_arrow_s3(s3_path: str, region: str = "ap-southeast-1") -> pa.Table:
     try:
         logging.info(f"[read_arrow_s3] Opening Arrow file from S3: s3://{s3_path}")
         
-        s3_fs = pa.fs.S3FileSystem(region=region).open_input_file(s3_path):
-        pa_reader = pa.ipc.RecordBatchFileReader(s3_fs):
+        s3_fs = pa.fs.S3FileSystem(region=region).open_input_file(s3_path)
+        pa_reader = pa.ipc.RecordBatchFileReader(s3_fs)
         pa_table = pa_reader.read_all()
         
         logging.info(f"[read_arrow_s3] Successfully read {pa_table.num_rows} rows and {pa_table.num_columns} columns")
