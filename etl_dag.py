@@ -38,8 +38,9 @@ def postgres_arrow_etl_dag():
     extract_batch_params = extract_batch.expand_kwargs(batch_params)
 
     # 4. Map load tasks per batch after extract (using staging table from XCom)
-    load_batch_task = load_batch.expand_kwargs(extract_batch_params).partial(dest_table_name_staging=staging_table_name)
-
+    load_batch_partial = load_batch.partial(dest_table_name_staging=staging_table_name)
+    load_batch_task = load_batch_partial.expand_kwargs(extract_batch_params)
+    
     # 5. Finalize table swap after all loads complete
     finalize_task = finalize_table_swap(conn_params, dest_table_name, staging_table_name)
 
