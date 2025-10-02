@@ -42,24 +42,23 @@ def write_batch(
             logging.warning(f"[write_batch] No data or schema provided for batch {batch_num}")
             return None
 
-        try:
-            pa_writer, s3_fs, s3_path = init_writer(
-                table_name=table_name,
-                pa_schema=pa_schema,
-                batch_num=batch_num
-            )
-            if pa_writer is None or s3_path is None:
-                raise RuntimeError(f"Failed to initialize writer for batch {batch_num}")
+        pa_writer, s3_fs, s3_path = init_writer(
+            table_name=table_name,
+            pa_schema=pa_schema,
+            batch_num=batch_num
+        )
+        if pa_writer is None or s3_path is None:
+            raise RuntimeError(f"Failed to initialize writer for batch {batch_num}")
 
-            pa_record_batch = pa.RecordBatch.from_arrays(pa_arrays, schema=pa_schema)
-            pa_writer.write_batch(pa_record_batch)
-            logging.info(f"[write_batch] Successfully wrote batch {batch_num} to {s3_path}")
-        finally:
-            pa_writer.close()
-            s3_fs.close()
+        pa_record_batch = pa.RecordBatch.from_arrays(pa_arrays, schema=pa_schema)
+        pa_writer.write_batch(pa_record_batch)
+        logging.info(f"[write_batch] Successfully wrote batch {batch_num} to {s3_path}")
     except Exception as e:
         logging.error(f"[write_batch] Error writing batch {batch_num}: {str(e)}")
         raise
+    finally:
+        pa_writer.close()
+        s3_fs.close()
     return s3_path
 
 def init_writer(
