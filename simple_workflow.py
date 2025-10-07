@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 import pendulum
 from time import sleep
 
-start_date = pendulum.now().subtract(days=1).replace(hour=10, minute=0, second=0, microsecond=0)
+# subtract(days=1).
+start_date = pendulum.now().replace(hour=10, minute=0, second=0, microsecond=0)
 default_args = {
     'owner': 'kang',
     'start_date': start_date}
