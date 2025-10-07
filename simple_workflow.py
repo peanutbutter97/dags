@@ -1,7 +1,7 @@
 import os
 from airflow import DAG
 from airflow import task
-from airflow.providers.standard.operators.python import PythonOperator
+from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 import pendulum
 from time import sleep
