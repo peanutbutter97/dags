@@ -304,7 +304,6 @@ def cleanup_s3_arrow_files(bucket: str, prefix: str) -> bool:
             if not contents:
                 continue
             delete_obj: List[Dict[str, str]] = [{"Key": obj["Key"]} for obj in contents]
-            print(delete_obj)
             response = s3.delete_objects(Bucket=bucket, Delete={"Objects": delete_obj})
             errors = response.get("Errors", [])
             if errors:
