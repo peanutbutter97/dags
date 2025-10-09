@@ -290,7 +290,7 @@ def get_dest_table_name(source_table_name: str, prefix: str = "etl") -> str:
 def cleanup_s3_arrow_files(bucket: str, prefix: str) -> bool:
     """Delete all Arrow files from a given S3 bucket/prefix.
     """
-    s3_path: str = f"s3://{bucket}/{prefix}"
+    s3_path: str = f"s3://{bucket}/{prefix}/"
     s3 = boto3.client("s3")
     logging.info(f"[S3 Cleanup] Deleting Arrow files from {s3_path}")
     try:
