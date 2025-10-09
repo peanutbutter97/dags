@@ -179,8 +179,8 @@ def post_load(conn_params: Dict, bucket_name: str, source_table_name, dest_table
 
     if is_success:
         # Cleanup S3 Arrow files
-        clean_table_name: str = f"{source_table_name.replace('.', '__').lstrip('_')}/"
-        cleanup_s3_arrow_files(bucket=bucket_name, prefix=clean_table_name)
+        prefix: str = f"{source_table_name.replace('.', '__')}/"
+        cleanup_s3_arrow_files(bucket=bucket_name, prefix=prefix)
         return True
     return False
 

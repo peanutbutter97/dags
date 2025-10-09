@@ -84,7 +84,7 @@ def init_writer(
     try:
         # Generate unique filename
         date_str = dt.datetime.now().strftime('%Y%m%d')
-        clean_table_name = table_name.replace('.', '__').lstrip('_')
+        clean_table_name = table_name.replace('.', '__')
         s3_obj_key = f"{clean_table_name}/{clean_table_name}_{date_str}_{batch_num:03d}.arrow"
 
         # Initialize writer and get s3 object key
@@ -290,13 +290,10 @@ def get_dest_table_name(source_table_name: str, prefix: str = "etl") -> str:
 def cleanup_s3_arrow_files(bucket: str, prefix: str) -> bool:
     """Delete all Arrow files from a given S3 bucket/prefix.
     """
-    s3_path: str = f"s3://{bucket}/{prefix}/"
+    s3_path: str = f"s3://{bucket}/{prefix}"
     s3 = boto3.client("s3")
     logging.info(f"[S3 Cleanup] Deleting Arrow files from {s3_path}")
     try:
-        resp = s3.list_objects_v2(Bucket=bucket, Prefix="public__dummy_tbl/")
-        for obj in resp.get("Contents", []):
-            print(obj["Key"])
         paginator = s3.get_paginator("list_objects_v2")
         for page in paginator.paginate(
             Bucket=bucket,
@@ -307,6 +304,7 @@ def cleanup_s3_arrow_files(bucket: str, prefix: str) -> bool:
             if not contents:
                 continue
             delete_obj: List[Dict[str, str]] = [{"Key": obj["Key"]} for obj in contents]
+            print(delete_obj)
             response = s3.delete_objects(Bucket=bucket, Delete={"Objects": delete_obj})
             deleted_count = len(response.get("Deleted", []))
             logging.info(f"[S3 Cleanup] Deleted {deleted_count} objects from {s3_path}")
