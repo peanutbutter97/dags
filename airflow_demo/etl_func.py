@@ -306,9 +306,13 @@ def cleanup_s3_arrow_files(bucket: str, prefix: str) -> bool:
             delete_obj: List[Dict[str, str]] = [{"Key": obj["Key"]} for obj in contents]
             print(delete_obj)
             response = s3.delete_objects(Bucket=bucket, Delete={"Objects": delete_obj})
+            errors = response.get("Errors", [])
+            if errors:
+                for err in errors:
+                    logging.error(f"[S3 Cleanup] Failed to delete {err.get('Key')}: {err.get('Code')} - {err.get('Message')}")
+                raise PermissionError(f"S3 delete failed for {len(errors)} object(s). Check logs.")
             deleted_count = len(response.get("Deleted", []))
             logging.info(f"[S3 Cleanup] Deleted {deleted_count} objects from {s3_path}")
-        logging.info(f"[S3 Cleanup] Successfully deleted all Arrow files from {s3_path}")
     except Exception as e:
         logging.error(f"[S3 Cleanup] Error deleting files from {s3_path}: {e}", exc_info=True)
         return False
