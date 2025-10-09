@@ -248,7 +248,7 @@ def atomic_table_swap(conn, dest_table_name: str, staging_table_name: str) -> bo
         cur.execute(rename_query)
         logging.info(f"[atomic_table_swap] Renamed {staging_table_name} to {dest_table_name}")
         
-        # Step 3: Drop old table (if it exists)
+        # Step 3: Drop old table (if exists)
         if table_exists(conn, old_table_name):
             drop_query = sql.SQL("DROP TABLE {}").format(
                 sql.Identifier(*old_table_name.split('.'))
