@@ -298,15 +298,15 @@ def cleanup_s3_arrow_files(bucket: str, prefix: str) -> bool:
         for page in paginator.paginate(
             Bucket=bucket,
             Prefix=prefix,
-            PaginationConfig={"PageSize": 1000}
+            PaginationConfig={"PageSize": 500}
         ):
             contents: List[Dict] = page.get("Contents", [])
             if not contents:
-                break
+                continue
             delete_obj: List[Dict[str, str]] = [{"Key": obj["Key"]} for obj in contents]
             response = s3.delete_objects(Bucket=bucket, Delete={"Objects": delete_obj})
             deleted_count = len(response.get("Deleted", []))
-            logging.info(f"[S3 Cleanup] Deleted {deleted_count} objects from s3://{bucket}/{prefix}")
+            logging.info(f"[S3 Cleanup] Deleted {deleted_count} objects from {s3_path}")
         logging.info(f"[S3 Cleanup] Successfully deleted all Arrow files from {s3_path}")
     except Exception as e:
         logging.error(f"[S3 Cleanup] Error deleting files from {s3_path}: {e}", exc_info=True)
