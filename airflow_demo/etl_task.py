@@ -162,13 +162,14 @@ def load_batch(
 def post_load(conn_params: Dict, bucket_name: str, source_table_name, dest_table_name: str, dest_table_name_staging: str, **context) -> bool:
     """Perform atomic table swap: staging -> dest, drop old."""
     conn = None
+    is_success: bool = False
     
     try:
         logging.info(f"[post_load] Starting atomic table swap")
         conn = init_db_conn(**conn_params)
         
         # Perform atomic table swap
-        atomic_table_swap(conn, dest_table_name, dest_table_name_staging)
+        is_success = atomic_table_swap(conn, dest_table_name, dest_table_name_staging)
         logging.info(f"[post_load] Successfully completed table swap")
     except Exception as e:
         logging.error(f"[post_load] Error during table swap: {str(e)}")
@@ -176,9 +177,12 @@ def post_load(conn_params: Dict, bucket_name: str, source_table_name, dest_table
     finally:
         close_db_connection(conn, None)
 
-    clean_table_name = source_table_name.replace('.', '__').lstrip('_')
-    cleanup_s3_arrow_files(bucket=bucket_name, prefix=clean_table_name)
-    return True
+    if is_success:
+        # Cleanup S3 Arrow files
+        clean_table_name = source_table_name.replace('.', '__').lstrip('_')
+        cleanup_s3_arrow_files(bucket=bucket_name, prefix=clean_table_name)
+        return True
+    return False
 
 @task(trigger_rule=TriggerRule.ONE_FAILED)
 def rollback_on_failure(conn_params: Dict, dest_table_name: str, dest_table_name_staging: str, **context) -> bool:

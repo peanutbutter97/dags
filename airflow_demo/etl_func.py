@@ -300,7 +300,7 @@ def cleanup_s3_arrow_files(bucket: str, prefix: str) -> bool:
             Prefix=prefix,
             PaginationConfig={"PageSize": 1000}
         ):
-            contents = page.get("Contents", [])
+            contents: List[Dict] = page.get("Contents", [])
             if not contents:
                 break
             delete_obj: List[Dict[str, str]] = [{"Key": obj["Key"]} for obj in contents]
