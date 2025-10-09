@@ -1,4 +1,4 @@
-from airflow_demo.etl_func import transform_batch, write_batch, convert_data_to_arrow, create_pa_schema, add_metadata_to_pa_tbl, read_arrow_s3
+from airflow_demo.etl_func import transform_batch, write_batch, convert_data_to_arrow, create_pa_schema, add_metadata_to_pa_tbl, read_arrow_s3, cleanup_s3_arrow_files
 from airflow_demo.db_func import init_db_conn, fetch_batch, close_db_connection, count_tbl_row, insert_batch_to_table, table_exists, drop_table_if_exists, create_staging_table_like, atomic_table_swap
 from airflow.decorators import task
 from typing import Dict
@@ -151,7 +151,6 @@ def load_batch(
         # 4. Insert batch into staging table
         rows_inserted = insert_batch_to_table(conn, dest_table_name_staging, data, column_names)
         logging.info(f"[load_batch] Successfully inserted {rows_inserted} rows into staging table {dest_table_name_staging}")
-
     except Exception as e:
         logging.error(f"[load_batch] Error inserting batch {batch_num} into staging table {dest_table_name_staging}: {str(e)}")
         raise
@@ -160,24 +159,26 @@ def load_batch(
     return {}
 
 @task(max_active_tis_per_dag=1)
-def finalize_table_swap(conn_params: Dict, dest_table_name: str, dest_table_name_staging: str, **context) -> bool:
+def post_load(conn_params: Dict, bucket_name: str, source_table_name, dest_table_name: str, dest_table_name_staging: str, **context) -> bool:
     """Perform atomic table swap: staging -> dest, drop old."""
     conn = None
     
     try:
-        logging.info(f"[finalize_table_swap] Starting atomic table swap")
+        logging.info(f"[post_load] Starting atomic table swap")
         conn = init_db_conn(**conn_params)
         
         # Perform atomic table swap
         atomic_table_swap(conn, dest_table_name, dest_table_name_staging)
-        logging.info(f"[finalize_table_swap] Successfully completed table swap")
-        return True
-        
+        logging.info(f"[post_load] Successfully completed table swap")
     except Exception as e:
-        logging.error(f"[finalize_table_swap] Error during table swap: {str(e)}")
+        logging.error(f"[post_load] Error during table swap: {str(e)}")
         raise
     finally:
         close_db_connection(conn, None)
+
+    clean_table_name = source_table_name.replace('.', '__').lstrip('_')
+    cleanup_s3_arrow_files(bucket=bucket_name, prefix=clean_table_name)
+    return True
 
 @task(trigger_rule=TriggerRule.ONE_FAILED)
 def rollback_on_failure(conn_params: Dict, dest_table_name: str, dest_table_name_staging: str, **context) -> bool:
@@ -236,8 +237,6 @@ def rollback_on_failure(conn_params: Dict, dest_table_name: str, dest_table_name
 
         conn.commit()
         logging.info("[rollback_task] Rollback completed successfully")
-        return True
-
     except Exception as e:
         logging.error(f"[rollback_task] Error during rollback: {str(e)}")
         if conn:

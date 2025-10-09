@@ -4,7 +4,7 @@ sys.path.append('/app')
 from airflow.decorators import dag
 from datetime import datetime
 from typing import Dict, List
-from airflow_demo.etl_task import get_batch_params, extract_batch, load_batch, rollback_on_failure, prepare_staging_table, finalize_table_swap
+from airflow_demo.etl_task import get_batch_params, extract_batch, load_batch, rollback_on_failure, prepare_staging_table, post_load
 from airflow_demo.etl_func import get_dest_table_name
 
 @dag(
@@ -59,13 +59,13 @@ def postgres_arrow_etl_dag():
     ).expand_kwargs(extract_batch_task)
 
     # 5. Finalize table swap after all loads complete
-    finalize_table_swap_task = finalize_table_swap(conn_params, dest_table_name, prepare_staging_table_task)
+    post_load_task = post_load(conn_params, bucket_name, source_table_name, dest_table_name, prepare_staging_table_task)
 
     # 6. Rollback task
     rollback_task = rollback_on_failure(conn_params, dest_table_name, prepare_staging_table_task)
 
     # Set dependencies
-    batch_params_task >> prepare_staging_table_task >> extract_batch_task >> load_batch_task >> finalize_table_swap_task
+    batch_params_task >> prepare_staging_table_task >> extract_batch_task >> load_batch_task >> post_load_task
     load_batch_task >> rollback_task
 
 # Instantiate the DAG
