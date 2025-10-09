@@ -294,6 +294,9 @@ def cleanup_s3_arrow_files(bucket: str, prefix: str) -> bool:
     s3 = boto3.client("s3")
     logging.info(f"[S3 Cleanup] Deleting Arrow files from {s3_path}")
     try:
+        resp = s3.list_objects_v2(Bucket=bucket, Prefix="public__dummy_tbl/")
+        for obj in resp.get("Contents", []):
+            print(obj["Key"])
         paginator = s3.get_paginator("list_objects_v2")
         for page in paginator.paginate(
             Bucket=bucket,
