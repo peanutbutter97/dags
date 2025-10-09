@@ -290,23 +290,21 @@ def get_dest_table_name(source_table_name: str, prefix: str = "etl") -> str:
 def cleanup_s3_arrow_files(bucket: str, prefix: str) -> bool:
     """Delete all Arrow files from a given S3 bucket/prefix.
     """
-    delete_objects: List[Dict] = []
 
     s3 = boto3.client("s3")
     logging.info(f"[S3 Cleanup] Deleting Arrow files from s3://{bucket}/{prefix}")
     try:
         paginator = s3.get_paginator("list_objects_v2")
-        
-        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
-            for obj in page.get("Contents", []):
-                delete_objects.append({"Key": obj["Key"]})
-                # Delete in batches of 1000 (S3 limit per request)
-                if len(delete_objects) == 1000:
-                    s3.delete_objects(Bucket=bucket, Delete={"Objects": delete_objects})
-                    delete_objects.clear()
-        # Delete any remaining objects (<1000)
-        if delete_objects:
-            s3.delete_objects(Bucket=bucket, Delete={"Objects": delete_objects})
+        for page in paginator.paginate(
+            Bucket=bucket,
+            Prefix=prefix,
+            PaginationConfig={"PageSize": 1000}
+        ):
+            contents = page.get("Contents", [])
+            if not contents:
+                break
+            delete_obj: List[Dict[str, str]] = [{"Key": obj["Key"]} for obj in contents]
+            s3.delete_objects(Bucket=bucket, Delete={"Objects": delete_obj})
         logging.info(f"[S3 Cleanup] Successfully deleted all Arrow files from s3://{bucket}/{prefix}")
     except Exception as e:
         logging.error(f"[S3 Cleanup] Error deleting files from s3://{bucket}/{prefix}: {e}", exc_info=True)
