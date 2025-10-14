@@ -38,7 +38,7 @@ with DAG(
     'Simple_Workflow',
     default_args=default_args,
     description='Simple ETL Airflow',
-    schedule="*/10 * * * *"  # timedelta(days=1),
+    schedule=None # "*/10 * * * *"  # timedelta(days=1),
 ) as dag:
     job_start = PythonOperator(
         task_id='Job_Start',
