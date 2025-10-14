@@ -23,6 +23,17 @@ def process_job():
     print("[Completed] Processing job...")
 
 
+pod_config = {
+    "KubernetesExecutor": {
+        "request_memory": "100Mi",
+        "limit_memory": "128Mi",
+        "request_cpu": "100m",
+        "limit_cpu": "250m",
+        "labels": {"type": "python-task"},
+        "annotations": {"purpose": "resource-test"},
+    }
+}
+
 with DAG(
     'Simple_Workflow',
     default_args=default_args,
@@ -43,7 +54,8 @@ with DAG(
 
     job_processing = PythonOperator(
         task_id='Job_Processing',
-        python_callable=process_job
+        python_callable=process_job,
+        executor_config=pod_config
     )
 
     job_start >> job_processing >> job_completed
