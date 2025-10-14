@@ -25,8 +25,8 @@ def process_job():
 
 pod_config = {
     "KubernetesExecutor": {
-        "request_memory": "128Mi",
-        "limit_memory": "256Mi",
+        "request_memory": "100Mi",
+        "limit_memory": "150Mi",
         "request_cpu": "100m",
         "limit_cpu": "250m",
         "labels": {"type": "python-task"},
@@ -59,3 +59,4 @@ with DAG(
     )
 
     job_start >> job_processing >> job_completed
+
