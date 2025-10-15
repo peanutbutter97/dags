@@ -26,10 +26,10 @@ def process_job():
 
 pod_config = {
     "KubernetesExecutor": {
-        "request_memory": "100Mi",
-        "limit_memory": "150Mi",
-        "request_cpu": "100m",
-        "limit_cpu": "250m",
+        "request_memory": "256Mi",
+        "limit_memory": "512Mi",
+        "request_cpu": "200m",
+        "limit_cpu": "450m",
         "labels": {"type": "python-task"},
         "annotations": {"purpose": "resource-test"},
     }
