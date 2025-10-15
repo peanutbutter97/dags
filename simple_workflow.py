@@ -62,7 +62,8 @@ with DAG(
 
     trigger_cronjob = BashOperator(
         task_id='Trigger_cronjob',
-        bash_command='kubectl create job --from=cronjob/$job_name $job_name-$(date +%s) -n $namespace',
+        bash_command='pip list',
+        # bash_command='kubectl create job --from=cronjob/$job_name $job_name-$(date +%s) -n $namespace',
         env={"namespace": "airflow-cluster", "job_name": "manual-trigger-job"}
     )
 
