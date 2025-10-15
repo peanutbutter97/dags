@@ -30,16 +30,16 @@ def postgres_arrow_etl_dag():
         'host': db_host,
     }
 
-    # 1. Calculate total batches
+    # 1. Prepare staging table
+    prepare_staging_table_task = prepare_staging_table(conn_params, dest_table_name, staging_table_name)
+
+    # 2. Calculate total batches
     batch_params_task = get_batch_params(
         conn_params=conn_params,
         source_table_name=source_table_name,
         batch_size=batch_size,
         where=where
     )
-
-    # 2. Prepare staging table
-    prepare_staging_table_task = prepare_staging_table(conn_params, dest_table_name, staging_table_name)
 
     # 3. Dynamically create extract tasks per batch
     extract_batch_task = extract_batch.partial(
@@ -66,7 +66,7 @@ def postgres_arrow_etl_dag():
     # rollback_task = rollback_on_failure(conn_params, dest_table_name, prepare_staging_table_task)
 
     # Set dependencies
-    batch_params_task >> prepare_staging_table_task >> extract_batch_task >> load_batch_task >> post_load_task
+    prepare_staging_table_task >> batch_params_task >> extract_batch_task >> load_batch_task >> post_load_task
     # load_batch_task >> rollback_task
 
 # Instantiate the DAG
