@@ -3,9 +3,11 @@ from airflow import DAG
 from airflow import task
 from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
+from airflow.providers.cncf.kubernetes.operators.job import KubernetesJobOperator
+from airflow.providers.cncf.kubernetes.hooks.kubernetes import KubernetesHook
 from datetime import datetime, timedelta
 import pendulum
-from time import sleep
+from time import sleep, time
 
 # subtract(days=1).
 start_date = datetime(2025, 10, 9, 7, 35, 00)  # pendulum.now().replace(hour=8, minute=0, second=0, microsecond=0)
@@ -22,6 +24,13 @@ def process_job():
     print("[Start] Processing job...")
     sleep(10)
     print("[Completed] Processing job...")
+
+
+def get_cronjob_spec():
+    hook = KubernetesHook()
+    api = hook.get_batch_v1_api()
+    cronjob = api.read_namespaced_cron_job("manual-trigger-job", "airflow-cluster")
+    return cronjob.spec.job_template.spec.template.spec
 
 
 pod_config = {
@@ -60,11 +69,23 @@ with DAG(
         executor_config=pod_config
     )
 
-    trigger_cronjob = BashOperator(
-        task_id='Trigger_cronjob',
-        bash_command='pip list',
-        # bash_command='kubectl create job --from=cronjob/$job_name $job_name-$(date +%s) -n $namespace',
-        env={"namespace": "airflow-cluster", "job_name": "manual-trigger-job"}
-    )
+    trigger_cronjob = KubernetesJobOperator(
+        task_id="trigger_manual_cronjob",
+        job_name=f"manual-run-{int(time())}",
+        body={
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "metadata": {"name": f"manual-run-{int(time())}", "namespace": "airflow-cluster"},
+            "spec": {
+                "template": {"spec": get_cronjob_spec()},
+            },
+        },
+)
+    # trigger_cronjob = BashOperator(
+    #     task_id='Trigger_cronjob',
+    #     bash_command='pip list',
+    #     # bash_command='kubectl create job --from=cronjob/$job_name $job_name-$(date +%s) -n $namespace',
+    #     env={"namespace": "airflow-cluster", "job_name": "manual-trigger-job"}
+    # )
 
     job_start >> job_processing >> trigger_cronjob >> job_completed
