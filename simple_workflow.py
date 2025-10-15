@@ -76,7 +76,7 @@ with DAG(
         # job_template=get_cronjob_spec(),
         task_id="trigger_manual_cronjob",
         namespace="airflow-cluster",
-        from_cronjob="manual-trigger-job"
+        full_job_spec=get_cronjob_spec(),
 )
     # trigger_cronjob = BashOperator(
     #     task_id='Trigger_cronjob',
