@@ -219,56 +219,62 @@ def drop_table_if_exists(conn, table_name: str) -> bool:
         if cur:
             cur.close()
 
-def atomic_table_swap(conn, dest_table_name: str, staging_table_name: str) -> bool:
-    """Perform atomic table swap: dest -> old, staging -> dest, drop old."""
+
+def atomic_table_refresh(conn, dest_table_name: str, staging_table_name: str, old_table_name: str = "") -> bool:
+    """
+    Atomically refresh a destination table using data from a staging table.
+
+    Steps:
+      1. TRUNCATE destination table.
+      2. INSERT data from staging table into destination.
+      3. DROP staging table.
+      4. DROP old table (if provided).
+    """
     cur = None
     try:
         cur = conn.cursor()
-        
-        # Generate old table name
-        old_table_name = f"{dest_table_name}_old"
-        
-        # Start transaction for atomic operation
-        cur.execute("BEGIN;")
-        
-        # Step 1: Rename current table to _old (if exists)
-        if table_exists(conn, dest_table_name):
-            rename_query = sql.SQL("ALTER TABLE {} RENAME TO {}").format(
-                sql.Identifier(*dest_table_name.split('.')),
-                sql.Identifier(old_table_name.split('.')[-1])
-            )
-            cur.execute(rename_query)
-            logging.info(f"[atomic_table_swap] Renamed {dest_table_name} to {old_table_name}")
-        
-        # Step 2: Rename staging table to destination
-        rename_query = sql.SQL("ALTER TABLE {} RENAME TO {}").format(
-            sql.Identifier(*staging_table_name.split('.')),
-            sql.Identifier(dest_table_name.split('.')[-1])
+        conn.autocommit = False
+        logging.info(f"[atomic_table_refresh] Starting atomic refresh for {dest_table_name}")
+
+        # Step 1: Truncate destination table
+        truncate_query = sql.SQL("TRUNCATE TABLE {}").format(sql.Identifier(*dest_table_name.split('.')))
+        cur.execute(truncate_query)
+        logging.info(f"[atomic_table_refresh] Truncated {dest_table_name}")
+
+        # Step 2: Copy data from staging -> destination
+        insert_query = sql.SQL("INSERT INTO {} SELECT * FROM {}").format(
+            sql.Identifier(*dest_table_name.split('.')),
+            sql.Identifier(*staging_table_name.split('.'))
         )
-        cur.execute(rename_query)
-        logging.info(f"[atomic_table_swap] Renamed {staging_table_name} to {dest_table_name}")
-        
-        # Step 3: Drop old table (if exists)
-        if table_exists(conn, old_table_name):
-            drop_query = sql.SQL("DROP TABLE {}").format(
-                sql.Identifier(*old_table_name.split('.'))
-            )
-            cur.execute(drop_query)
-            logging.info(f"[atomic_table_swap] Dropped old table {old_table_name}")
-        
-        # Commit transaction
-        cur.execute("COMMIT;")
-        logging.info(f"[atomic_table_swap] Successfully completed atomic table swap")
+        cur.execute(insert_query)
+        logging.info(f"[atomic_table_refresh] Copied data from {staging_table_name} to {dest_table_name}")
+
+        # Step 3: Drop staging table
+        if table_exists(conn, staging_table_name):
+            drop_staging_query = sql.SQL("DROP TABLE {}").format(sql.Identifier(*staging_table_name.split('.')))
+            cur.execute(drop_staging_query)
+            logging.info(f"[atomic_table_refresh] Dropped staging table {staging_table_name}")
+
+        # Step 4: Drop old table (optional)
+        if old_table_name and table_exists(conn, old_table_name):
+            drop_old_query = sql.SQL("DROP TABLE {}").format(sql.Identifier(*old_table_name.split('.')))
+            cur.execute(drop_old_query)
+            logging.info(f"[atomic_table_refresh] Dropped old table {old_table_name}")
+
+        conn.commit()
+        logging.info(f"[atomic_table_refresh] Successfully completed atomic refresh for {dest_table_name}")
         return True
-        
+
     except Exception as e:
-        logging.error(f"[atomic_table_swap] Error during table swap: {str(e)}")
-        if cur:
-            cur.execute("ROLLBACK;")
+        logging.error(f"[atomic_table_refresh] Error during atomic refresh: {e}")
+        if conn:
+            conn.rollback()
         raise
+
     finally:
         if cur:
             cur.close()
+        conn.autocommit = True
 
 def create_staging_table_like(conn, dest_table_name: str, staging_table_name: str) -> bool:
     """Create staging table using CREATE TABLE ... LIKE syntax."""
@@ -277,7 +283,7 @@ def create_staging_table_like(conn, dest_table_name: str, staging_table_name: st
         cur = conn.cursor()
         
         # Create staging table with same structure as destination table
-        create_query = sql.SQL("CREATE TABLE {} (LIKE {} INCLUDING ALL)").format(
+        create_query = sql.SQL("CREATE TABLE {} (LIKE {} INCLUDING CONSTRAINTS INCLUDING DEFAULTS INCLUDING IDENTITY)").format(
             sql.Identifier(*staging_table_name.split('.')),
             sql.Identifier(*dest_table_name.split('.'))
         )

@@ -1,5 +1,5 @@
 from airflow_demo.etl_func import transform_batch, write_batch, convert_data_to_arrow, create_pa_schema, add_metadata_to_pa_tbl, read_arrow_s3, cleanup_s3_arrow_files
-from airflow_demo.db_func import init_db_conn, fetch_batch, close_db_connection, count_tbl_row, insert_batch_to_table, table_exists, drop_table_if_exists, create_staging_table_like, atomic_table_swap
+from airflow_demo.db_func import init_db_conn, fetch_batch, close_db_connection, count_tbl_row, insert_batch_to_table, table_exists, drop_table_if_exists, create_staging_table_like, atomic_table_refresh
 from airflow.decorators import task
 from typing import Dict
 import logging
@@ -78,13 +78,9 @@ def extract_batch(
     return batch_params
 
 @task(max_active_tis_per_dag=1)
-def prepare_staging_table(conn_params: Dict, dest_table_name: str, **context) -> str:
+def prepare_staging_table(conn_params: Dict, dest_table_name: str, staging_table_name: str, **context) -> bool:
     """Prepare staging table with same DDL as destination table."""
     conn = None
-    
-    # Generate staging table name
-    staging_table_name = f"{dest_table_name}_staging"
-    
     try:
         logging.info(f"[prepare_staging_table] Preparing staging table {staging_table_name}")
         conn = init_db_conn(**conn_params)
@@ -101,9 +97,7 @@ def prepare_staging_table(conn_params: Dict, dest_table_name: str, **context) ->
         else:
             logging.warning(f"[prepare_staging_table] Destination table {dest_table_name} does not exist")
             raise ValueError(f"Destination table {dest_table_name} must exist to create staging table")
-        
-        return staging_table_name
-        
+        return True
     except Exception as e:
         logging.error(f"[prepare_staging_table] Error preparing staging table: {str(e)}")
         raise
@@ -160,7 +154,7 @@ def load_batch(
 
 @task(max_active_tis_per_dag=1)
 def post_load(conn_params: Dict, bucket_name: str, source_table_name, dest_table_name: str, dest_table_name_staging: str, **context) -> bool:
-    """Perform atomic table swap: staging -> dest, drop old."""
+    """Perform atomic table refresh: staging -> dest, drop old."""
     conn = None
     is_success: bool = False
     
@@ -169,7 +163,7 @@ def post_load(conn_params: Dict, bucket_name: str, source_table_name, dest_table
         conn = init_db_conn(**conn_params)
         
         # Perform atomic table swap
-        is_success = atomic_table_swap(conn, dest_table_name, dest_table_name_staging)
+        is_success = atomic_table_refresh(conn, dest_table_name, dest_table_name_staging, old_table_name=f"{dest_table_name}_old")
         logging.info(f"[post_load] Successfully completed table swap")
     except Exception as e:
         logging.error(f"[post_load] Error during table swap: {str(e)}")
@@ -184,68 +178,68 @@ def post_load(conn_params: Dict, bucket_name: str, source_table_name, dest_table
         return True
     return False
 
-@task(trigger_rule=TriggerRule.ONE_FAILED)
-def rollback_on_failure(conn_params: Dict, dest_table_name: str, dest_table_name_staging: str, **context) -> bool:
-    """
-    Rollback logic:
-    - Drop staging table if exists.
-    - If dest_table_name_old exists:
-        - Drop dest_table_name if exists.
-        - Rename dest_table_name_old to dest_table_name.
-    """
-    conn = None
-    cur = None
-    old_table_name = f"{dest_table_name}_old"
-    try:
-        logging.info(f"[rollback_task] Connecting to DB at {conn_params['host']}")
-        conn = init_db_conn(**conn_params)
-        cur = conn.cursor()
+# @task(trigger_rule=TriggerRule.ONE_FAILED)
+# def rollback_on_failure(conn_params: Dict, dest_table_name: str, dest_table_name_staging: str, **context) -> bool:
+#     """
+#     Rollback logic:
+#     - Drop staging table if exists.
+#     - If dest_table_name_old exists:
+#         - Drop dest_table_name if exists.
+#         - Rename dest_table_name_old to dest_table_name.
+#     """
+#     conn = None
+#     cur = None
+#     old_table_name = f"{dest_table_name}_old"
+#     try:
+#         logging.info(f"[rollback_task] Connecting to DB at {conn_params['host']}")
+#         conn = init_db_conn(**conn_params)
+#         cur = conn.cursor()
 
-        # Drop staging table if exists
-        logging.info(f"[rollback_task] Dropping staging table if exists: {dest_table_name_staging}")
-        cur.execute(
-            sql.SQL("DROP TABLE IF EXISTS {}").format(
-                sql.Identifier(*dest_table_name_staging.split('.'))
-            )
-        )
+#         # Drop staging table if exists
+#         logging.info(f"[rollback_task] Dropping staging table if exists: {dest_table_name_staging}")
+#         cur.execute(
+#             sql.SQL("DROP TABLE IF EXISTS {}").format(
+#                 sql.Identifier(*dest_table_name_staging.split('.'))
+#             )
+#         )
 
-        # Check if old table exists
-        logging.info(f"[rollback_task] Checking if old table exists: {old_table_name}")
-        cur.execute(
-            """
-            SELECT EXISTS (
-                SELECT 1 FROM information_schema.tables
-                WHERE table_schema = %s AND table_name = %s
-            )
-            """,
-            (old_table_name.split('.')[0] if '.' in old_table_name else 'public', old_table_name.split('.')[-1])
-        )
-        old_exists = cur.fetchone()[0]
+#         # Check if old table exists
+#         logging.info(f"[rollback_task] Checking if old table exists: {old_table_name}")
+#         cur.execute(
+#             """
+#             SELECT EXISTS (
+#                 SELECT 1 FROM information_schema.tables
+#                 WHERE table_schema = %s AND table_name = %s
+#             )
+#             """,
+#             (old_table_name.split('.')[0] if '.' in old_table_name else 'public', old_table_name.split('.')[-1])
+#         )
+#         old_exists = cur.fetchone()[0]
 
-        if old_exists:
-            # Drop dest_table_name if exists
-            logging.info(f"[rollback_task] Dropping dest table if exists: {dest_table_name}")
-            cur.execute(
-                sql.SQL("DROP TABLE IF EXISTS {}").format(
-                    sql.Identifier(*dest_table_name.split('.'))
-                )
-            )
-            # Rename old table back to dest_table_name
-            logging.info(f"[rollback_task] Renaming {old_table_name} to {dest_table_name}")
-            cur.execute(
-                sql.SQL("ALTER TABLE {} RENAME TO {}").format(
-                    sql.Identifier(*old_table_name.split('.')),
-                    sql.Identifier(dest_table_name.split('.')[-1])
-                )
-            )
+#         if old_exists:
+#             # Drop dest_table_name if exists
+#             logging.info(f"[rollback_task] Dropping dest table if exists: {dest_table_name}")
+#             cur.execute(
+#                 sql.SQL("DROP TABLE IF EXISTS {}").format(
+#                     sql.Identifier(*dest_table_name.split('.'))
+#                 )
+#             )
+#             # Rename old table back to dest_table_name
+#             logging.info(f"[rollback_task] Renaming {old_table_name} to {dest_table_name}")
+#             cur.execute(
+#                 sql.SQL("ALTER TABLE {} RENAME TO {}").format(
+#                     sql.Identifier(*old_table_name.split('.')),
+#                     sql.Identifier(dest_table_name.split('.')[-1])
+#                 )
+#             )
 
-        conn.commit()
-        logging.info("[rollback_task] Rollback completed successfully")
-    except Exception as e:
-        logging.error(f"[rollback_task] Error during rollback: {str(e)}")
-        if conn:
-            conn.rollback()
-        raise
-    finally:
-        close_db_connection(conn, cur)
-    return True
+#         conn.commit()
+#         logging.info("[rollback_task] Rollback completed successfully")
+#     except Exception as e:
+#         logging.error(f"[rollback_task] Error during rollback: {str(e)}")
+#         if conn:
+#             conn.rollback()
+#         raise
+#     finally:
+#         close_db_connection(conn, cur)
+#     return True
