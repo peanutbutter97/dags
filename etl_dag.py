@@ -1,5 +1,5 @@
-import sys
-sys.path.append('/app')
+# import sys
+# sys.path.append('/app')
 
 from airflow.decorators import dag
 from datetime import datetime
