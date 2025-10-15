@@ -76,7 +76,7 @@ with DAG(
         # job_template=get_cronjob_spec(),
         task_id="trigger_manual_cronjob",
         job_name=f"manual-run-{int(time())}",
-        body={
+        job_object={
             "apiVersion": "batch/v1",
             "kind": "Job",
             "metadata": {"name": f"manual-trigger-job", "namespace": "airflow-cluster"},
