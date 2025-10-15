@@ -70,12 +70,16 @@ with DAG(
     )
 
     trigger_cronjob = KubernetesJobOperator(
+        # task_id='Trigger_cronjob',
+        # job_name='manual-trigger-job',
+        # namespace='airflow-cluster',
+        # job_template=get_cronjob_spec(),
         task_id="trigger_manual_cronjob",
         job_name=f"manual-run-{int(time())}",
         body={
             "apiVersion": "batch/v1",
             "kind": "Job",
-            "metadata": {"name": f"manual-run-{int(time())}", "namespace": "airflow-cluster"},
+            "metadata": {"name": f"manual-trigger-job", "namespace": "airflow-cluster"},
             "spec": {
                 "template": {"spec": get_cronjob_spec()},
             },
