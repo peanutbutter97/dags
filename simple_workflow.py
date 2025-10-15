@@ -75,14 +75,8 @@ with DAG(
         # namespace='airflow-cluster',
         # job_template=get_cronjob_spec(),
         task_id="trigger_manual_cronjob",
-        body={
-            "apiVersion": "batch/v1",
-            "kind": "Job",
-            "metadata": {"name": f"manual-trigger-job", "namespace": "airflow-cluster"},
-            "spec": {
-                "template": {"spec": get_cronjob_spec()},
-            },
-        },
+        namespace="airflow-cluster",
+        from_cronjob="manual-trigger-job"
 )
     # trigger_cronjob = BashOperator(
     #     task_id='Trigger_cronjob',
