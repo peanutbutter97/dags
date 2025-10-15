@@ -28,7 +28,7 @@ def process_job():
 
 def get_cronjob_spec():
     hook = KubernetesHook()
-    api = hook.get_batch_v1_api()
+    api = hook.batch_v1_client
     cronjob = api.read_namespaced_cron_job("manual-trigger-job", "airflow-cluster")
     return cronjob.spec.job_template.spec.template.spec
 
@@ -89,3 +89,4 @@ with DAG(
     # )
 
     job_start >> job_processing >> trigger_cronjob >> job_completed
+    # kubectl describe pod airflow-cluster-triggerer-bd6d789b4-zkvw9 -n airflow-cluster
