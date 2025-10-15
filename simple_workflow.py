@@ -2,6 +2,7 @@ import os
 from airflow import DAG
 from airflow import task
 from airflow.operators.python import PythonOperator
+from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
 import pendulum
 from time import sleep
@@ -49,7 +50,8 @@ with DAG(
     job_completed = PythonOperator(
         task_id='Job_End',
         python_callable=job,
-        op_kwargs={"status": "Completed"}
+        op_kwargs={"status": "Completed"},
+        op_args=[]
     )
 
     job_processing = PythonOperator(
@@ -58,5 +60,10 @@ with DAG(
         executor_config=pod_config
     )
 
-    job_start >> job_processing >> job_completed
+    trigger_cronjob = BashOperator(
+        task_id='Trigger_cronjob',
+        bash_command='kubectl create job --from=cronjob/$job_name $job_name-$(date +%s) -n $namespace',
+        env={"namespace": "airflow-cluster", "job_name": "manual-trigger-job"}
+    )
 
+    job_start >> job_processing >> trigger_cronjob >> job_completed
