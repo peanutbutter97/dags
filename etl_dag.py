@@ -4,7 +4,7 @@ sys.path.append('/app')
 from airflow.decorators import dag
 from datetime import datetime
 from typing import Dict, List
-from airflow_demo.etl_task import get_batch_params, extract_batch, load_batch, rollback_on_failure, prepare_staging_table, post_load
+from airflow_demo.etl_task import get_batch_params, extract_batch, load_batch, prepare_staging_table, post_load
 from airflow_demo.etl_func import get_dest_table_name
 
 @dag(
