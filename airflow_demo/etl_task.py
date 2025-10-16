@@ -25,7 +25,7 @@ def get_batch_params(conn_params: Dict, source_table_name: str, batch_size: int,
     finally:
         close_db_connection(conn, cur)
 
-@task(max_active_tis_per_dag=1)
+@task(max_active_tis_per_dag=2)
 def extract_batch(
     conn_params: Dict,
     bucket_name: str,
@@ -104,7 +104,7 @@ def prepare_staging_table(conn_params: Dict, dest_table_name: str, staging_table
     finally:
         close_db_connection(conn, None)
 
-@task(max_active_tis_per_dag=1)
+@task(max_active_tis_per_dag=2)
 def load_batch(
     conn_params: Dict,
     batch_num: int,
@@ -162,9 +162,8 @@ def post_load(conn_params: Dict, bucket_name: str, source_table_name, dest_table
         logging.info(f"[post_load] Starting atomic table swap")
         conn = init_db_conn(**conn_params)
         
-        # Perform atomic table swap
+        # Perform atomic table refresh
         is_success = atomic_table_refresh(conn, dest_table_name, dest_table_name_staging, old_table_name=f"{dest_table_name}_old")
-        logging.info(f"[post_load] Successfully completed table swap")
     except Exception as e:
         logging.error(f"[post_load] Error during table swap: {str(e)}")
         raise
