@@ -5,8 +5,8 @@ from typing import Dict
 import logging
 import math
 from typing import List, Optional, Tuple
-from airflow.utils.trigger_rule import TriggerRule
-from psycopg2 import sql
+# from airflow.utils.trigger_rule import TriggerRule
+# from psycopg2 import sql
 
 @task(max_active_tis_per_dag=1)
 def get_batch_params(conn_params: Dict, source_table_name: str, batch_size: int, where: str = "", **context) -> list[dict]:
@@ -25,7 +25,7 @@ def get_batch_params(conn_params: Dict, source_table_name: str, batch_size: int,
     finally:
         close_db_connection(conn, cur)
 
-@task(max_active_tis_per_dag=2)
+@task(max_active_tis_per_dag=1)
 def extract_batch(
     conn_params: Dict,
     bucket_name: str,
@@ -104,7 +104,7 @@ def prepare_staging_table(conn_params: Dict, dest_table_name: str, staging_table
     finally:
         close_db_connection(conn, None)
 
-@task(max_active_tis_per_dag=2)
+@task(max_active_tis_per_dag=1)
 def load_batch(
     conn_params: Dict,
     batch_num: int,
