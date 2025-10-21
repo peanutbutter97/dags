@@ -46,7 +46,7 @@ def create_hello_world_pod():
 def taskflow_k8s_dag():
     trigger_job = KubernetesCronJobOperator(
         task_id="trigger_hello_cronjob",
-        name="hello-cron",
+        name="manual-trigger-job",
         namespace="airflow-k8s-task",
         do_xcom_push=True,
     )
