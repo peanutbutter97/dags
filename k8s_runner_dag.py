@@ -18,7 +18,6 @@ def run_hello_world_in_k8s():
     hello_pod = KubernetesPodOperator(
             task_id="run-hello-world",
             name="hello-world",
-            full_pod_name=True,
             namespace="default",
             image="python:3.12-slim",
             cmds=["python", "/scripts/hello.py"],
