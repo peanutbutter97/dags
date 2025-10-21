@@ -30,7 +30,7 @@ def get_cronjob_spec():
     hook = KubernetesHook()
     api = hook.batch_v1_client
     cronjob = api.read_namespaced_cron_job("manual-trigger-job", "airflow-cluster")
-    print(cronjob.spec.job_template.spec.template.spec)
+    print(cronjob)
     return cronjob.spec.job_template.spec.template.spec
 
 
