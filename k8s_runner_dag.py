@@ -20,20 +20,36 @@ def create_hello_world_pod():
     )
 
     hello_pod = KubernetesPodOperator(
-            task_id="run-hello-world",
-            name="hello-world",
-            namespace="airflow-k8s-task",
-            image="python:3.12-slim",
-            cmds=["bash", "-c"],
-            arguments=[
-                "pip install --no-cache-dir -r /app/requirements.txt && python /app/hello.py"
-            ],
-            container_resources=resources,
-            volumes=[volume],
-            volume_mounts=[volume_mount],
-            is_delete_operator_pod=True,
-            get_logs=True,
-        )
+        task_id="trigger_hello_cron_job",
+        name="trigger-hello-cron",
+        namespace="airflow-cluster",
+        image="bitnami/kubectl:latest",
+        cmds=["kubectl"],
+        arguments=[
+            "create", "job",
+            "--from=cronjob/manual-trigger-job",
+            "manual-hello-job", "-n", "airflow-cluster"
+        ],
+        container_resources=resources,
+        is_delete_operator_pod=True,
+        get_logs=True,
+    )
+
+    # hello_pod = KubernetesPodOperator(
+    #         task_id="run-hello-world",
+    #         name="hello-world",
+    #         namespace="airflow-k8s-task",
+    #         image="python:3.12-slim",
+    #         cmds=["bash", "-c"],
+    #         arguments=[
+    #             "pip install --no-cache-dir -r /app/requirements.txt && python /app/hello.py"
+    #         ],
+    #         container_resources=resources,
+    #         volumes=[volume],
+    #         volume_mounts=[volume_mount],
+    #         is_delete_operator_pod=True,
+    #         get_logs=True,
+    #     )
 
     return hello_pod
 
@@ -44,17 +60,6 @@ def create_hello_world_pod():
     catchup=False,
 )
 def taskflow_k8s_dag():
-    trigger_hello_cron = KubernetesPodOperator(
-        task_id="trigger_hello_cron_job",
-        name="trigger-hello-cron",
-        namespace="airflow-k8s-task",
-        image="bitnami/kubectl:latest",  # lightweight image with kubectl
-        cmds=["kubectl"],
-        arguments=[
-            "create", "job", "--from=cronjob/manual-trigger-job", "manual-hello-job", "-n", "airflow-k8s-task"
-        ],
-        is_delete_operator_pod=True,
-        get_logs=True,
-    )
+    hello_pod = create_hello_world_pod()
 
 taskflow_k8s_dag = taskflow_k8s_dag()
