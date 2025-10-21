@@ -109,7 +109,7 @@ with DAG(
 
     trigger_cronjob = KubernetesJobOperator(
         # task_id='Trigger_cronjob',
-        job_name=f'manual-trigger-job-{int(datetime.now().timestamp())}',
+        # job_name=f'manual-trigger-job-{int(datetime.now().timestamp())}',
         # job_template=get_cronjob_spec(),
         task_id="trigger_manual_cronjob",
         namespace="airflow-cluster",
