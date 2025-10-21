@@ -1,6 +1,6 @@
 from datetime import datetime
 from airflow.decorators import dag
-from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
+from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator, KubernetesCronJobOperator
 from kubernetes.client import V1Volume, V1VolumeMount, V1ConfigMapVolumeSource, V1ResourceRequirements
 
 def create_hello_world_pod():
@@ -44,6 +44,11 @@ def create_hello_world_pod():
     catchup=False,
 )
 def taskflow_k8s_dag():
-    hello_world_task = create_hello_world_pod()
+    trigger_job = KubernetesCronJobOperator(
+        task_id="trigger_hello_cronjob",
+        name="hello-cron",
+        namespace="airflow-k8s-task",
+        do_xcom_push=True,
+    )
 
 taskflow_k8s_dag = taskflow_k8s_dag()
