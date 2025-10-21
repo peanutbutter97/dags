@@ -1,7 +1,7 @@
 from datetime import datetime
 from airflow.decorators import dag
 from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
-from kubernetes.client import V1Volume, V1VolumeMount, V1ConfigMapVolumeSource
+from kubernetes.client import V1Volume, V1VolumeMount, V1ConfigMapVolumeSource, V1ResourceRequirements
 
 def create_hello_world_pod():
     volume = V1Volume(
@@ -14,10 +14,10 @@ def create_hello_world_pod():
         mount_path="/app"
     )
 
-    resources = {
-        "requests": {"cpu": "250m", "memory": "256Mi"},
-        "limits": {"cpu": "500m", "memory": "512Mi"},
-    }
+    resources = V1ResourceRequirements(
+        requests={"cpu": "250m", "memory": "256Mi"},
+        limits={"cpu": "500m", "memory": "512Mi"}
+    )
 
     hello_pod = KubernetesPodOperator(
             task_id="run-hello-world",
