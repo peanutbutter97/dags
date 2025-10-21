@@ -8,6 +8,7 @@ from airflow.providers.cncf.kubernetes.hooks.kubernetes import KubernetesHook
 from datetime import datetime, timedelta
 import pendulum
 from time import sleep, time
+import logging
 
 # subtract(days=1).
 start_date = datetime(2025, 10, 9, 7, 35, 00)  # pendulum.now().replace(hour=8, minute=0, second=0, microsecond=0)
@@ -30,7 +31,7 @@ def get_cronjob_spec():
     hook = KubernetesHook()
     api = hook.batch_v1_client
     cronjob = api.read_namespaced_cron_job("manual-trigger-job", "airflow-cluster")
-    print(cronjob)
+    logging.info(cronjob)
     return cronjob.spec.job_template.spec.template.spec
 
 
