@@ -11,7 +11,7 @@ def create_hello_world_pod():
 
     volume_mount = V1VolumeMount(
         name="hello-src-volume",
-        mount_path="/scripts"
+        mount_path="/app"
     )
 
     hello_pod = KubernetesPodOperator(
@@ -19,7 +19,7 @@ def create_hello_world_pod():
             name="hello-world",
             namespace="airflow-k8s-task",
             image="python:3.12-slim",
-            cmds=["python", "/scripts/hello.py"],
+            cmds=["python", "/app/hello.py"],
             volumes=[volume],
             volume_mounts=[volume_mount],
             is_delete_operator_pod=True,
