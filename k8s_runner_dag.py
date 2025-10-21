@@ -4,7 +4,7 @@ from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import Kubernete
 from kubernetes.client import V1Volume, V1VolumeMount, V1ConfigMapVolumeSource
 
 @task
-def run_hello_world_in_k8s():
+def create_hello_world_pod():
     volume = V1Volume(
         name="hello-src-volume",
         config_map=V1ConfigMapVolumeSource(name="hello-src")
@@ -27,7 +27,7 @@ def run_hello_world_in_k8s():
             get_logs=True,
         )
 
-    return hello_pod.execute(context={})
+    return hello_pod
 
 @dag(
     dag_id="taskflow_k8s_hello_task",
@@ -36,6 +36,7 @@ def run_hello_world_in_k8s():
     catchup=False,
 )
 def taskflow_k8s_dag():
-    run_hello_world_in_k8s()
+    hello_pod = create_hello_world_pod()
+    hello_pod.execute(context={})
 
 taskflow_k8s_dag = taskflow_k8s_dag()
