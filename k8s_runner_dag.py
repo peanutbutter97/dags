@@ -15,10 +15,8 @@ def create_hello_world_pod():
     )
 
     resources = {
-        "request_cpu": "250m",
-        "request_memory": "256Mi",
-        "limit_cpu": "500m",
-        "limit_memory": "512Mi",
+        "requests": {"cpu": "250m", "memory": "256Mi"},
+        "limits": {"cpu": "500m", "memory": "512Mi"},
     }
 
     hello_pod = KubernetesPodOperator(
