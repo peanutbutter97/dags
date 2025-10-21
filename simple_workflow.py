@@ -32,7 +32,7 @@ def get_cronjob_spec():
     api = hook.batch_v1_client
     cronjob = api.read_namespaced_cron_job("manual-trigger-job", "airflow-cluster")
     logging.info(cronjob)
-    return cronjob.spec.job_template.spec.template.spec
+    return cronjob.spec.job_template.spec
 
 
 pod_config = {
