@@ -1,6 +1,7 @@
 from datetime import datetime
 from airflow.decorators import dag
-from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator, KubernetesCronJobOperator
+from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
+from airflow.providers.cncf.kubernetes.operators.kubernetes_cronjob import KubernetesCronJobOperator
 from kubernetes.client import V1Volume, V1VolumeMount, V1ConfigMapVolumeSource, V1ResourceRequirements
 
 def create_hello_world_pod():
