@@ -32,7 +32,7 @@ def run_hello_world_in_k8s():
     return hello_pod.execute(context={})
 
 @dag(
-    dag_id="taskflow_k8s_hello_task_decorator",
+    dag_id="taskflow_k8s_hello_task",
     start_date=datetime(2025, 1, 1),
     schedule=None,
     catchup=False,
