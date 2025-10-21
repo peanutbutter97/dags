@@ -28,7 +28,6 @@ def create_hello_world_pod():
             arguments=[
                 "pip install --no-cache-dir -r /app/requirements.txt && python /app/hello.py"
             ],
-            resources=resources,
             volumes=[volume],
             volume_mounts=[volume_mount],
             is_delete_operator_pod=True,
