@@ -34,7 +34,7 @@ def get_cronjob_spec():
     api = hook.batch_v1_client
     cronjob = api.read_namespaced_cron_job("manual-trigger-job", "airflow-cluster")
 
-    job_name = f"{cronjob.metadata.name}-manual-{int(datetime.now().timestamp())}"
+    job_name = f"{cronjob.metadata.name}-{int(datetime.now().timestamp())}"
     job = client.V1Job(
         api_version="batch/v1",
         kind="Job",
@@ -62,7 +62,7 @@ def trigger_cronjob_test():
     )
 
     # Create a new Job name (to avoid conflicts)
-    job_name = f"{cronjob.metadata.name}-manual-{int(datetime.now().timestamp())}"
+    job_name = f"{cronjob.metadata.name}-{int(datetime.now().timestamp())}"
 
     # Build the Job object from the CronJob's job template
     job = client.V1Job(
