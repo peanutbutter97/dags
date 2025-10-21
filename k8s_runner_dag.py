@@ -14,10 +14,10 @@ def create_hello_world_pod():
         mount_path="/app"
     )
 
-    resources = V1ResourceRequirements(
-        requests={"cpu": "250m", "memory": "256Mi"},
-        limits={"cpu": "500m", "memory": "512Mi"}
-    )
+    # resources = V1ResourceRequirements(
+    #     requests={"cpu": "250m", "memory": "256Mi"},
+    #     limits={"cpu": "500m", "memory": "512Mi"}
+    # )
 
     hello_pod = KubernetesPodOperator(
             task_id="run-hello-world",
