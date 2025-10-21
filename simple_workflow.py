@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 import pendulum
 from time import sleep, time
 import logging
+from kubernetes import client, config
+
 
 # subtract(days=1).
 start_date = datetime(2025, 10, 9, 7, 35, 00)  # pendulum.now().replace(hour=8, minute=0, second=0, microsecond=0)
@@ -34,6 +36,41 @@ def get_cronjob_spec():
     logging.info(cronjob)
     return cronjob.spec.job_template.spec
 
+def trigger_cronjob_test():
+    """
+        Trigger a Kubernetes CronJob manually by creating a Job from its jobTemplate spec.
+        """
+    # Load in-cluster config if running inside Kubernetes (Airflow deployed in K8s)
+    config.load_incluster_config()
+
+    # Initialize BatchV1 API
+    batch_v1 = client.BatchV1Api()
+    v_namespace="airflow-cluster"
+
+    # Read the CronJob definition
+    cronjob = batch_v1.read_namespaced_cron_job(
+        name="manual-trigger-job",
+        namespace=v_namespace
+    )
+
+    # Create a new Job name (to avoid conflicts)
+    job_name = f"{cronjob.metadata.name}-manual-{int(datetime.now().timestamp())}"
+
+    # Build the Job object from the CronJob's job template
+    job = client.V1Job(
+        api_version="batch/v1",
+        kind="Job",
+        metadata=client.V1ObjectMeta(name=job_name),
+        spec=cronjob.spec.job_template.spec,
+    )
+
+    response = batch_v1.create_namespaced_job(
+        namespace=v_namespace,
+        body=job
+    )
+
+    print(f"✅ Successfully triggered manual Job: {response.metadata.name}")
+    return response.metadata.name
 
 pod_config = {
     "KubernetesExecutor": {
@@ -71,15 +108,20 @@ with DAG(
         executor_config=pod_config
     )
 
-    trigger_cronjob = KubernetesJobOperator(
-        # task_id='Trigger_cronjob',
-        # job_name='manual-trigger-job',
-        # namespace='airflow-cluster',
-        # job_template=get_cronjob_spec(),
-        task_id="trigger_manual_cronjob",
-        namespace="airflow-cluster",
-        full_job_spec=get_cronjob_spec(),
-)
+    # trigger_cronjob = KubernetesJobOperator(
+    #     # task_id='Trigger_cronjob',
+    #     # job_name='manual-trigger-job',
+    #     # namespace='airflow-cluster',
+    #     # job_template=get_cronjob_spec(),
+    #     task_id="trigger_manual_cronjob",
+    #     namespace="airflow-cluster",
+    #     full_job_spec=get_cronjob_spec(),
+    # )
+
+    trigger_cronjob = PythonOperator(
+        task_id="trigger_cronjob_task",
+        python_callable=trigger_cronjob_test,
+    )
     # trigger_cronjob = BashOperator(
     #     task_id='Trigger_cronjob',
     #     bash_command='pip list',
