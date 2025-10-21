@@ -19,7 +19,10 @@ def create_hello_world_pod():
             name="hello-world",
             namespace="airflow-k8s-task",
             image="python:3.12-slim",
-            cmds=["python", "/app/hello.py"],
+            cmds=["bash", "-c"],
+            arguments=[
+                "pip install --no-cache-dir -r /app/requirements.txt && python /app/hello.py"
+            ],
             volumes=[volume],
             volume_mounts=[volume_mount],
             is_delete_operator_pod=True,
