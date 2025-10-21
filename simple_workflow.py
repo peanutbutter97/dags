@@ -33,7 +33,6 @@ def get_cronjob_spec():
     hook = KubernetesHook()
     api = hook.batch_v1_client
     cronjob = api.read_namespaced_cron_job("manual-trigger-job", "airflow-cluster")
-    logging.info(cronjob)
     return cronjob.spec.job_template.spec
 
 def trigger_cronjob_test():
@@ -108,20 +107,19 @@ with DAG(
         executor_config=pod_config
     )
 
-    # trigger_cronjob = KubernetesJobOperator(
-    #     # task_id='Trigger_cronjob',
-    #     # job_name='manual-trigger-job',
-    #     # namespace='airflow-cluster',
-    #     # job_template=get_cronjob_spec(),
-    #     task_id="trigger_manual_cronjob",
-    #     namespace="airflow-cluster",
-    #     full_job_spec=get_cronjob_spec(),
-    # )
-
-    trigger_cronjob = PythonOperator(
-        task_id="trigger_cronjob_task",
-        python_callable=trigger_cronjob_test,
+    trigger_cronjob = KubernetesJobOperator(
+        # task_id='Trigger_cronjob',
+        job_name=f'manual-trigger-job-{int(datetime.now().timestamp())}',
+        # job_template=get_cronjob_spec(),
+        task_id="trigger_manual_cronjob",
+        namespace="airflow-cluster",
+        full_job_spec=get_cronjob_spec(),
     )
+
+    # trigger_cronjob = PythonOperator(
+    #     task_id="trigger_cronjob_task",
+    #     python_callable=trigger_cronjob_test,
+    # )
     # trigger_cronjob = BashOperator(
     #     task_id='Trigger_cronjob',
     #     bash_command='pip list',
