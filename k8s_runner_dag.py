@@ -17,7 +17,7 @@ def create_hello_world_pod():
     hello_pod = KubernetesPodOperator(
             task_id="run-hello-world",
             name="hello-world",
-            namespace="default",
+            namespace="airflow-k8s-task",
             image="python:3.12-slim",
             cmds=["python", "/scripts/hello.py"],
             volumes=[volume],
@@ -29,7 +29,7 @@ def create_hello_world_pod():
     return hello_pod
 
 @dag(
-    dag_id="taskflow_k8s_hello_task",
+    dag_id="airflow_k8s_hello_task",
     start_date=datetime(2025, 1, 1),
     schedule=None,
     catchup=False,
